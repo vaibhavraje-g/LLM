@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Token, Matrix } from '../types';
+import type { Token, Matrix } from '../types';
 
 interface EmbeddingViewProps {
   tokens: Token[];

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Token } from '../types';
+import type { Token } from '../types';
 
 interface TokenizationViewProps {
   input: string;

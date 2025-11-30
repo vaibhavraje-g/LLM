@@ -1,5 +1,5 @@
-import { Token } from '../types';
-import { TOKENS, VOCABULARY } from './constants';
+import type { Token } from '../types';
+import { TOKENS } from './constants';
 
 export const tokenize = (text: string): Token[] => {
   // Simple whitespace and punctuation splitting

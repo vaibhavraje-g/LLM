@@ -1,5 +1,5 @@
 import React from 'react';
-import { ModelConfig } from '../types';
+import type { ModelConfig } from '../types';
 
 interface InputPanelProps {
   input: string;

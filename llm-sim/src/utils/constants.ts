@@ -1,4 +1,4 @@
-import { Token } from '../types';
+import type { Token } from '../types';
 
 export const VOCABULARY: string[] = [
   "<PAD>", "<START>", "<END>", "<UNK>", 

@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Play, SkipForward, RefreshCw, Settings, ChevronDown, ChevronRight, 
+  Play, SkipForward, RefreshCw, Settings, 
   Info, Database, ArrowRight, CornerDownLeft, X, 
-  Brain, Calculator,  List, Type, Search
+  Brain, Calculator,  List, Search
 } from 'lucide-react';
+import { TransformerBlockView } from './components/TransformerBlockView';
+import { AutoregressiveSimulationView } from './components/AutoregressiveSimulationView';
+import { InteractiveOutputView } from './components/InteractiveOutputView';
 
 // --- Constants & Config ---
 
@@ -249,13 +252,15 @@ export default function App() {
   const [embedDim, setEmbedDim] = useState(4);
   const [temperature, setTemperature] = useState(1.0);
   const [maxTokens, setMaxTokens] = useState(5);
+  const [topK] = useState(5);
+  const [topP] = useState(0.9);
   
   // Simulation State
   const [pipelineData, setPipelineData] = useState<any>(null);
   const [isAutoRunning, setIsAutoRunning] = useState(false);
   const [activeStep, setActiveStep] = useState<string | null>(null); // For detail view
   
-  const autoRunRef = useRef<NodeJS.Timeout | null>(null);
+  const autoRunRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // --- Derived Constants (Model Weights Simulation) ---
@@ -741,6 +746,9 @@ export default function App() {
               <ArrowDown />
 
               {/* 2. TRANSFORMER BLOCK (CONTAINER) */}
+              {explanationMode === 'technical' && pipelineData ? (
+                 <TransformerBlockView data={pipelineData} dim={embedDim} />
+              ) : (
               <div className="border-2 border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/50 relative">
                   <span className="absolute -top-3 left-4 bg-slate-50 px-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Transformer Block</span>
                   
@@ -799,7 +807,7 @@ export default function App() {
 
                   <ArrowDown />
 
-                  {/* FEED FORWARD */}
+                  {/* FFN */}
                   <DiagramBlock 
                     title="3. Feed Forward Network" 
                     color="orange"
@@ -810,36 +818,29 @@ export default function App() {
                   >
                      <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-1 mr-2">
-                          {renderWeightsIcon("W_FF1", "First Linear Layer (Expansion)")}
-                          {renderWeightsIcon("W_FF2", "Second Linear Layer (Projection)")}
+                           {renderWeightsIcon("W_1", "Expansion Layer (4x size)")}
+                           {renderWeightsIcon("W_2", "Projection Layer (Back to d_model)")}
                         </div>
-
-                        <div className="flex-1 flex items-center justify-center gap-2">
-                           <div className="bg-orange-50 border border-orange-200 p-2 rounded text-center">
-                              <div className="text-xs font-bold text-orange-800">Linear</div>
-                              <div className="text-[9px] text-orange-600">Expand</div>
-                           </div>
-                           <ArrowRight size={12} />
-                           <div className="bg-white border px-2 py-1 rounded shadow-sm" title="Activation Function (ReLU/GELU)">
-                              <div className="text-xs font-bold">ReLU</div>
-                           </div>
-                           <ArrowRight size={12} />
-                           <div className="bg-orange-50 border border-orange-200 p-2 rounded text-center">
-                              <div className="text-xs font-bold text-orange-800">Linear</div>
-                              <div className="text-[9px] text-orange-600">Project</div>
+                        <div className="flex-1 bg-white rounded border border-orange-200 p-2 flex flex-col items-center shadow-sm">
+                           <div className="text-[10px] font-bold text-orange-800 mb-1">Non-Linearity (ReLU)</div>
+                           <div className="w-full h-8 bg-orange-50 rounded border border-orange-100 flex items-end justify-center gap-0.5 pb-1 px-1">
+                              {[0.1, 0.5, 0, 0.8, 0, 0.3].map((h, i) => (
+                                <div key={i} className="w-2 bg-orange-400" style={{ height: `${h * 100}%` }}></div>
+                              ))}
                            </div>
                         </div>
                      </div>
                   </DiagramBlock>
 
-                  <ArrowDown />
-
-                  <div className="flex justify-center">
+                  <div className="flex justify-center mt-1">
                      <Tooltip text="Residual Connection & Layer Norm">
                        <span className="bg-gray-200 text-gray-600 text-[9px] px-2 rounded-full cursor-help">Add & Norm</span>
                      </Tooltip>
                   </div>
               </div>
+              )}
+
+
 
               <ArrowDown />
 
@@ -853,55 +854,71 @@ export default function App() {
                     active={activeStep === "output"}
                     onClick={() => setActiveStep("output")}
                   >
-                    <div className="flex flex-col gap-4">
-                       {/* Logits Calculation */}
-                       <div className="flex items-center justify-center gap-4 border-b border-green-100 pb-2">
-                          {renderWeightsIcon("W_Vocab", "Vocabulary Projection Matrix")}
-                          <div className="text-lg text-gray-400">×</div>
-                          <div className="bg-orange-50 border border-orange-200 px-2 py-1 rounded text-xs text-orange-800">Final Vector</div>
-                          <ArrowRight size={16} />
-                          <div className="bg-green-50 border border-green-200 px-2 py-1 rounded text-xs text-green-800 font-bold">Logits</div>
-                       </div>
+                     {explanationMode === 'technical' && pipelineData ? (
+                        <InteractiveOutputView 
+                           logits={pipelineData.logits} 
+                           vocab={VOCAB}
+                           initialTemperature={temperature}
+                           initialTopK={topK}
+                           initialTopP={topP}
+                        />
+                     ) : (
+                     <div className="flex flex-col gap-4">
+                        {/* Logits Calculation */}
+                        <div className="flex items-center justify-center gap-4 border-b border-green-100 pb-2">
+                           {renderWeightsIcon("W_Vocab", "Vocabulary Projection Matrix")}
+                           <div className="text-lg text-gray-400">×</div>
+                           <div className="bg-orange-50 border border-orange-200 px-2 py-1 rounded text-xs text-orange-800">Final Vector</div>
+                           <ArrowRight size={16} />
+                           <div className="bg-green-50 border border-green-200 px-2 py-1 rounded text-xs text-green-800 font-bold">Logits</div>
+                        </div>
 
-                       {/* Softmax & Sampling Visualization */}
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Chart */}
-                          <div className="h-24 flex items-end gap-0.5 border-b border-gray-300">
-                             {pipelineData.probs.map((p: number, i: number) => (
-                                <div key={i} className="flex-1 bg-green-400 hover:bg-green-600 transition-colors relative group" style={{ height: `${p*100}%` }}>
-                                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-black text-white text-[9px] px-1 rounded whitespace-nowrap z-50">
-                                      {VOCAB[i]}: {(p*100).toFixed(0)}%
-                                   </div>
-                                </div>
-                             ))}
-                          </div>
-                          
-                          {/* Selection Logic */}
-                          <div className="flex flex-col justify-center text-xs space-y-2">
-                             <div className="flex justify-between items-center bg-gray-50 p-1 rounded">
-                                <span>Temperature:</span>
-                                <span className="font-mono font-bold">{temperature}</span>
-                             </div>
-                             <div className="flex justify-between items-center bg-yellow-50 p-1 rounded border border-yellow-200">
-                                <span>Selected:</span>
-                                <span className="font-mono font-bold text-yellow-800">
-                                   {generatedTokens.length > 0 ? generatedTokens[generatedTokens.length-1] : "..."}
-                                </span>
-                             </div>
-                             <p className="text-[9px] text-gray-400 leading-tight">
-                                {explanationMode === 'simple' 
-                                  ? "We spin a wheel of fortune where higher bars have bigger slices." 
-                                  : "Token sampled from probability distribution (Categorical)."}
-                             </p>
-                          </div>
-                       </div>
-                    </div>
+                        {/* Softmax & Sampling Visualization */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           {/* Chart */}
+                           <div className="h-24 flex items-end gap-0.5 border-b border-gray-300">
+                              {pipelineData.probs.map((p: number, i: number) => (
+                                 <div key={i} className="flex-1 bg-green-400 hover:bg-green-600 transition-colors relative group" style={{ height: `${p*100}%` }}>
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-black text-white text-[9px] px-1 rounded whitespace-nowrap z-50">
+                                       {VOCAB[i]}: {(p*100).toFixed(0)}%
+                                    </div>
+                                 </div>
+                              ))}
+                           </div>
+                           
+                           {/* Selection Logic */}
+                           <div className="flex flex-col justify-center text-xs space-y-2">
+                              <div className="flex justify-between items-center bg-gray-50 p-1 rounded">
+                                 <span>Temperature:</span>
+                                 <span className="font-mono font-bold">{temperature}</span>
+                              </div>
+                              <div className="flex justify-between items-center bg-yellow-50 p-1 rounded border border-yellow-200">
+                                 <span>Selected:</span>
+                                 <span className="font-mono font-bold text-yellow-800">
+                                    {generatedTokens.length > 0 ? generatedTokens[generatedTokens.length-1] : "..."}
+                                 </span>
+                              </div>
+                              <p className="text-[9px] text-gray-400 leading-tight">
+                                 {explanationMode === 'simple' 
+                                   ? "We spin a wheel of fortune where higher bars have bigger slices." 
+                                   : "Token sampled from probability distribution (Categorical)."}
+                              </p>
+                           </div>
+                        </div>
+                     </div>
+                     )}
                   </DiagramBlock>
               </div>
 
-              {/* LOOP VISUALIZATION LINE */}
-              <div className="absolute top-10 -right-4 md:-right-12 bottom-20 w-8 md:w-12 border-r-2 border-b-2 border-dashed border-gray-300 rounded-br-3xl pointer-events-none opacity-50 hidden md:block" />
-              <div className="absolute bottom-20 -right-4 md:-right-12 text-gray-300 text-[10px] rotate-90 hidden md:block">Autoregressive Loop</div>
+              <ArrowDown />
+
+              {/* 5. AUTOREGRESSIVE LOOP */}
+              <div ref={bottomRef}>
+                 <AutoregressiveSimulationView 
+                    generatedTokens={generatedTokens.map((t, i) => ({ id: i, text: t, color: 'bg-green-100' }))} 
+                    maxTokens={maxTokens} 
+                 />
+              </div>
 
               {/* Bottom Anchor */}
               <div ref={bottomRef} className="h-4" />
